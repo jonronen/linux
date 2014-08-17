@@ -637,6 +637,20 @@ static struct platform_device bcm2708_i2s_device = {
 };
 #endif
 
+#if defined(CONFIG_SND_BCM2708_SOC_PCM3060_BOARD) || defined(CONFIG_SND_BCM2708_SOC_PCM3060_BOARD_MODULE)
+static struct platform_device snd_pcm3060_board_device = {
+        .name = "snd-pcm3060-board",
+        .id = 0,
+        .num_resources = 0,
+};
+
+static struct platform_device snd_pcm3060_codec_device = {
+        .name = "pcm3060-codec",
+        .id = -1,
+        .num_resources = 0,
+};
+#endif
+
 #if defined(CONFIG_SND_BCM2708_SOC_HIFIBERRY_DAC) || defined(CONFIG_SND_BCM2708_SOC_HIFIBERRY_DAC_MODULE)
 static struct platform_device snd_hifiberry_dac_device = {
         .name = "snd-hifiberry-dac",
@@ -835,6 +849,11 @@ void __init bcm2708_init(void)
 
 #ifdef CONFIG_SND_BCM2708_SOC_I2S_MODULE
 	bcm_register_device(&bcm2708_i2s_device);
+#endif
+
+#if defined(CONFIG_SND_BCM2708_SOC_PCM3060_BOARD) || defined(CONFIG_SND_BCM2708_SOC_PCM3060_BOARD_MODULE)
+        bcm_register_device(&snd_pcm3060_board_device);
+        bcm_register_device(&snd_pcm3060_codec_device);
 #endif
 
 #if defined(CONFIG_SND_BCM2708_SOC_HIFIBERRY_DAC) || defined(CONFIG_SND_BCM2708_SOC_HIFIBERRY_DAC_MODULE)

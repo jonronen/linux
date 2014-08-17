@@ -23,6 +23,13 @@ config SND_BCM2708_SOC_HIFIBERRY_DACPLUS
         help
          Say Y or M if you want to add support for HifiBerry DAC+.
 
+config SND_BCM2708_SOC_PCM3060_BOARD
+        tristate "Support for PCM3060 board"
+        depends on SND_BCM2708_SOC_I2S
+        select SND_SOC_PCM3060
+        help
+         Say Y or M if you want to add support for PCM3060 board.
+
 config SND_BCM2708_SOC_HIFIBERRY_DIGI
         tristate "Support for HifiBerry Digi"
         depends on SND_BCM2708_SOC_I2S
