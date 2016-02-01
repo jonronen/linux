@@ -40,6 +40,7 @@
 #include <linux/delay.h>
 #include <linux/io.h>
 #include <linux/clk.h>
+#include <mach/gpio.h>
 
 #include <sound/core.h>
 #include <sound/pcm.h>
@@ -318,6 +319,26 @@ static int bcm2708_i2s_set_dai_bclk_ratio(struct snd_soc_dai *dai,
 	return 0;
 }
 
+
+static int bcm2708_i2s_set_function(unsigned offset, int function)
+{
+	#define GPIOFSEL(x)  (0x00+(x)*4)
+	void __iomem *gpio = __io_address(GPIO_BASE);
+	unsigned alt = function <= 3 ? function + 4: function == 4 ? 3 : 2;
+	unsigned gpiodir;
+	unsigned gpio_bank = offset / 10;
+	unsigned gpio_field_offset = (offset - 10 * gpio_bank) * 3;
+
+	if (offset >= BCM2708_NR_GPIOS)
+		return -EINVAL;
+
+	gpiodir = readl(gpio + GPIOFSEL(gpio_bank));
+	gpiodir &= ~(7 << gpio_field_offset);
+	gpiodir |= alt << gpio_field_offset;
+	writel(gpiodir, gpio + GPIOFSEL(gpio_bank));
+	return 0;
+}
+
 static void bcm2708_i2s_setup_gpio(void)
 {
 	/*
@@ -326,18 +347,12 @@ static void bcm2708_i2s_setup_gpio(void)
 	 * TODO Better way would be to handle
 	 * this in the device tree!
 	 */
-#define INP_GPIO(g) *(gpio+((g)/10)) &= ~(7<<(((g)%10)*3))
-#define SET_GPIO_ALT(g,a) *(gpio+(((g)/10))) |= (((a)<=3?(a)+4:(a)==4?3:2)<<(((g)%10)*3))
-
-	unsigned int *gpio;
 	int pin,pinconfig,startpin,alt;
-
-	gpio = ioremap(GPIO_BASE, SZ_16K);
 
 	/* SPI is on different GPIOs on different boards */
         /* for Raspberry Pi B+, this is pin GPIO18-21, for original on 28-31 */
 	if (bcm2708_i2s_gpio==BCM2708_I2S_GPIO_AUTO) {	
-		if (system_rev >= 0x10) {
+		if ((system_rev & 0xffffff) >= 0x10) {
 			/* Model B+ */
 			pinconfig=BCM2708_I2S_GPIO_PIN18;
 		} else {
@@ -361,12 +376,8 @@ static void bcm2708_i2s_setup_gpio(void)
 
 	/* configure I2S pins to correct ALT mode */
 	for (pin = startpin; pin <= startpin+3; pin++) {
-                INP_GPIO(pin);		/* set mode to GPIO input first */
-                SET_GPIO_ALT(pin, alt);	/* set mode to ALT  */
+		bcm2708_i2s_set_function(pin, alt);
 	}
-	
-#undef INP_GPIO
-#undef SET_GPIO_ALT
 }
 
 static int bcm2708_i2s_hw_params(struct snd_pcm_substream *substream,
@@ -411,15 +422,15 @@ static int bcm2708_i2s_hw_params(struct snd_pcm_substream *substream,
 	switch (params_format(params)) {
 	case SNDRV_PCM_FORMAT_S16_LE:
 		data_length = 16;
-		bclk_ratio = 40;
+		bclk_ratio = 50;
 		break;
 	case SNDRV_PCM_FORMAT_S24_LE:
 		data_length = 24;
-		bclk_ratio = 40;
+		bclk_ratio = 50;
 		break;
 	case SNDRV_PCM_FORMAT_S32_LE:
 		data_length = 32;
-		bclk_ratio = 80;
+		bclk_ratio = 100;
 		break;
 	default:
 		return -EINVAL;
@@ -785,7 +796,7 @@ static struct snd_soc_dai_driver bcm2708_i2s_dai = {
 		.channels_max = 2,
 		.rates =	SNDRV_PCM_RATE_8000_192000,
 		.formats =	SNDRV_PCM_FMTBIT_S16_LE
-				// | SNDRV_PCM_FMTBIT_S24_LE : disable for now, it causes white noise with xbmc
+				| SNDRV_PCM_FMTBIT_S24_LE
 				| SNDRV_PCM_FMTBIT_S32_LE
 		},
 	.capture = {
@@ -842,6 +853,7 @@ static const struct regmap_config bcm2708_regmap_config[] = {
 		.precious_reg = bcm2708_i2s_precious_reg,
 		.volatile_reg = bcm2708_i2s_volatile_reg,
 		.cache_type = REGCACHE_RBTREE,
+		.name = "i2s",
 	},
 	{
 		.reg_bits = 32,
@@ -850,6 +862,7 @@ static const struct regmap_config bcm2708_regmap_config[] = {
 		.max_register = BCM2708_CLK_PCMDIV_REG,
 		.volatile_reg = bcm2708_clk_volatile_reg,
 		.cache_type = REGCACHE_RBTREE,
+		.name = "clk",
 	},
 };
 
